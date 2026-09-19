@@ -10,10 +10,14 @@
             box-sizing: border-box;
         }
 
+        html,
         body {
             margin: 0;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
             background: url("./Sprites/FlappyBackground.png") center/cover no-repeat;
             display: flex;
             justify-content: center;
@@ -190,13 +194,14 @@
     let HighestScore = Number(localStorage.getItem("FlappyDaveHighScore")) || 0
     let Pipes = []
     let GameLoopRunning = false
+    let LastTime = 0
 
     const Bird = {
         X: 170,
         Y: 300,
         Width: 75,
         Height: 75,
-        Hitbox: 30,
+        Hitbox: 28,
         Velocity: 0
     }
 
@@ -210,7 +215,7 @@
 
         Bird.X = 170
         Bird.Y = 300
-        Bird.Velocity = 0
+        Bird.Velocity = 2
 
         ScoreLabel.textContent = "0"
         FinalScore.textContent = "Score: 0"
@@ -223,6 +228,7 @@
 
         GameStarted = true
         GameLoopRunning = false
+        LastTime = performance.now()
 
         StartScreen.style.display = "none"
         GameOverScreen.style.display = "none"
@@ -237,6 +243,7 @@
         if (!GameStarted) return
 
         GameStarted = false
+        GameLoopRunning = false
 
         if (Score > HighestScore) {
             HighestScore = Score
@@ -251,6 +258,8 @@
 
         FinalScore.textContent = "Score: " + Score
         GameOverScreen.style.display = "flex"
+
+        Draw()
     }
 
     function Flap() {
@@ -260,8 +269,8 @@
     }
 
     function CreatePipe(X) {
-        const Gap = 240
-        const MinimumTop = 50
+        const Gap = 220
+        const MinimumTop = 70
         const MaximumTop = GameHeight - Gap - 70
 
         const Top =
@@ -278,9 +287,11 @@
         })
     }
 
-    function Update() {
-        Bird.Velocity += 0.3
-        Bird.Y += Bird.Velocity
+    function Update(DeltaTime) {
+        const TimeScale = Math.min(DeltaTime / 12, 2)
+
+        Bird.Velocity += 0.3 * TimeScale
+        Bird.Y += Bird.Velocity * TimeScale
 
         if (
             Bird.Y + Bird.Hitbox >= GameHeight ||
@@ -290,17 +301,10 @@
             return
         }
 
-        if (
-            Pipes.length &&
-            Pipes[Pipes.length - 1].X < 500
-        ) {
-            CreatePipe(GameWidth)
-        }
-
         for (let i = Pipes.length - 1; i >= 0; i--) {
             const Pipe = Pipes[i]
 
-            Pipe.X -= 4
+            Pipe.X -= 4 * TimeScale
 
             if (
                 !Pipe.Passed &&
@@ -309,7 +313,6 @@
                 Pipe.Passed = true
 
                 Score++
-
                 ScoreLabel.textContent = Score
             }
 
@@ -341,6 +344,13 @@
                 GameOver()
                 return
             }
+        }
+
+        if (
+            Pipes.length === 0 ||
+            Pipes[Pipes.length - 1].X < GameWidth - 400
+        ) {
+            CreatePipe(GameWidth + 100)
         }
     }
 
@@ -410,23 +420,32 @@
         if (GameLoopRunning) return
 
         GameLoopRunning = true
+        LastTime = performance.now()
+
         requestAnimationFrame(GameLoop)
     }
 
-    function GameLoop() {
+    function GameLoop(CurrentTime) {
         if (!GameStarted) {
             GameLoopRunning = false
             return
         }
 
-        Update()
+        const DeltaTime = CurrentTime - LastTime
+        LastTime = CurrentTime
+
+        Update(DeltaTime)
         Draw()
 
-        requestAnimationFrame(GameLoop)
+        if (GameStarted) {
+            requestAnimationFrame(GameLoop)
+        } else {
+            GameLoopRunning = false
+        }
     }
 
-    StartButton.onclick = StartGame
-    RestartButton.onclick = StartGame
+    StartButton.addEventListener("click", StartGame)
+    RestartButton.addEventListener("click", StartGame)
 
     Canvas.addEventListener("mousedown", function(Event) {
         Event.preventDefault()
