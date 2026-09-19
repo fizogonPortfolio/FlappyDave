@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Dave</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            width: 100vw;
+            height: 100vh;
+            background: url("./Sprites/FlappyBackground.png") center/cover no-repeat;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #Game {
+            position: relative;
+            width: min(900px, 100vw);
+            height: min(700px, 100vh);
+            aspect-ratio: 9 / 7;
+            overflow: hidden;
+        }
+
+        canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        button {
+            width: 125px;
+            height: 60px;
+            font-size: 30px;
+            font-weight: bold;
+            color: whitesmoke;
+            border-radius: 15px;
+            border: 0;
+            box-shadow: 2px 2px 3px black;
+            cursor: pointer;
+            transition: transform .2s ease;
+            text-shadow:
+                -1px -1px 0 black,
+                1px -1px 0 black,
+                -1px 1px 0 black,
+                1px 1px 0 black,
+                3px 3px 2px black;
+        }
+
+        button:hover {
+            transform: scale(1.1);
+        }
+
+        button:active {
+            transform: scale(1.05);
+        }
+
+        .StartButton {
+            background: limegreen;
+        }
+
+        .RestartButton {
+            background: orange;
+        }
+
+        #StartScreen,
+        #GameOverScreen {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2;
+        }
+
+        #GameOverScreen {
+            display: none;
+        }
+
+        h1 {
+            margin: 0 0 25px;
+            color: whitesmoke;
+            font-size: clamp(40px, 7vw, 60px);
+            text-align: center;
+            text-shadow:
+                -2px -2px 0 black,
+                2px -2px 0 black,
+                -2px 2px 0 black,
+                2px 2px 0 black,
+                4px 4px 2px black;
+        }
+
+        #Score,
+        #HighestScore,
+        #FinalScore {
+            color: whitesmoke;
+            font-weight: bold;
+            text-shadow:
+                -1px -1px 0 black,
+                1px -1px 0 black,
+                -1px 1px 0 black,
+                1px 1px 0 black,
+                2px 2px 2px black;
+        }
+
+        #Score {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: clamp(35px, 6vw, 50px);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        #HighestScore {
+            position: absolute;
+            top: 75px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: clamp(16px, 2.5vw, 20px);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        #FinalScore {
+            font-size: 25px;
+            margin-bottom: 25px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="Game">
+    <canvas id="Canvas" width="900" height="700"></canvas>
+
+    <div id="Score">0</div>
+    <div id="HighestScore">High Score: 0</div>
+
+    <div id="StartScreen">
+        <h1>Flappy Dave</h1>
+        <button class="StartButton" id="StartButton">Start</button>
+    </div>
+
+    <div id="GameOverScreen">
+        <h1><strong>Game Over - Dave Got CUMMED On!</strong></h1>
+        <div id="FinalScore">Score: 0</div>
+        <button class="RestartButton" id="RestartButton">Restart</button>
+    </div>
+</div>
+
+<script>
+    const Canvas = document.getElementById("Canvas")
+    const Context = Canvas.getContext("2d")
+
+    const StartScreen = document.getElementById("StartScreen")
+    const GameOverScreen = document.getElementById("GameOverScreen")
+
+    const StartButton = document.getElementById("StartButton")
+    const RestartButton = document.getElementById("RestartButton")
+
+    const ScoreLabel = document.getElementById("Score")
+    const HighestScoreLabel = document.getElementById("HighestScore")
+    const FinalScore = document.getElementById("FinalScore")
+
+    const PipeImage = new Image()
+    PipeImage.src = "./Sprites/dildopic.png"
+
+    const DaveImage = new Image()
+    DaveImage.src = "./Sprites/daveimage.png"
+
+    const GameWidth = 900
+    const GameHeight = 700
+
+    let GameStarted = false
+    let Score = 0
+    let HighestScore = Number(localStorage.getItem("FlappyDaveHighScore")) || 0
+    let Pipes = []
+
+    const Bird = {
+        X: 170,
+        Y: 300,
+        Width: 75,
+        Height: 75,
+        Hitbox: 30,
+        Velocity: 0
+    }
+
+    function UpdateHighScore() {
+        HighestScoreLabel.textContent = "High Score: " + HighestScore
+    }
+
+    function ResetGame() {
+        Score = 0
+        Pipes = []
+
+        Bird.X = 170
+        Bird.Y = 300
+        Bird.Velocity = 0
+
+        ScoreLabel.textContent = "0"
+        FinalScore.textContent = "Score: 0"
+    }
+
+    function StartGame() {
+        if (GameStarted) return
+
+        ResetGame()
+
+        GameStarted = true
+
+        StartScreen.style.display = "none"
+        GameOverScreen.style.display = "none"
+
+        CreatePipe(GameWidth + 100)
+        CreatePipe(GameWidth + 500)
+
+        requestAnimationFrame(GameLoop)
+    }
+
+    function GameOver() {
+        if (!GameStarted) return
+
+        GameStarted = false
+
+        if (Score > HighestScore) {
+            HighestScore = Score
+
+            localStorage.setItem(
+                "FlappyDaveHighScore",
+                HighestScore
+            )
+
+            UpdateHighScore()
+        }
+
+        FinalScore.textContent = "Score: " + Score
+        GameOverScreen.style.display = "flex"
+    }
+
+    function Flap() {
+        if (!GameStarted) return
+
+        Bird.Velocity = -7
+    }
+
+    function CreatePipe(X) {
+        const Gap = 240
+        const MinimumTop = 50
+        const MaximumTop = GameHeight - Gap - 70
+
+        const Top =
+            Math.random() *
+            (MaximumTop - MinimumTop) +
+            MinimumTop
+
+        Pipes.push({
+            X: X,
+            Width: 100,
+            Top: Top,
+            Bottom: Top + Gap,
+            Passed: false
+        })
+    }
+
+    function Update() {
+        Bird.Velocity += 0.3
+        Bird.Y += Bird.Velocity
+
+        if (
+            Bird.Y + Bird.Hitbox >= GameHeight ||
+            Bird.Y - Bird.Hitbox <= 0
+        ) {
+            GameOver()
+            return
+        }
+
+        if (
+            Pipes.length &&
+            Pipes[Pipes.length - 1].X < 500
+        ) {
+            CreatePipe(GameWidth)
+        }
+
+        for (let i = Pipes.length - 1; i >= 0; i--) {
+            const Pipe = Pipes[i]
+
+            Pipe.X -= 4
+
+            if (
+                !Pipe.Passed &&
+                Pipe.X + Pipe.Width < Bird.X
+            ) {
+                Pipe.Passed = true
+
+                Score++
+
+                ScoreLabel.textContent = Score
+            }
+
+            if (Pipe.X + Pipe.Width < 0) {
+                Pipes.splice(i, 1)
+                continue
+            }
+
+            const BirdLeft = Bird.X - Bird.Hitbox
+            const BirdRight = Bird.X + Bird.Hitbox
+            const BirdTop = Bird.Y - Bird.Hitbox
+            const BirdBottom = Bird.Y + Bird.Hitbox
+
+            const PipeLeft = Pipe.X
+            const PipeRight = Pipe.X + Pipe.Width
+
+            const HorizontalCollision =
+                BirdRight > PipeLeft &&
+                BirdLeft < PipeRight
+
+            const VerticalCollision =
+                BirdTop < Pipe.Top ||
+                BirdBottom > Pipe.Bottom
+
+            if (
+                HorizontalCollision &&
+                VerticalCollision
+            ) {
+                GameOver()
+                return
+            }
+        }
+    }
+
+    function DrawPipe(Pipe) {
+        if (!PipeImage.complete || !PipeImage.naturalWidth) {
+            return
+        }
+
+        Context.drawImage(
+            PipeImage,
+            Pipe.X,
+            Pipe.Bottom,
+            Pipe.Width,
+            GameHeight - Pipe.Bottom
+        )
+
+        Context.save()
+
+        Context.translate(
+            Pipe.X + Pipe.Width / 2,
+            Pipe.Top / 2
+        )
+
+        Context.rotate(Math.PI)
+
+        Context.drawImage(
+            PipeImage,
+            -Pipe.Width / 2,
+            -Pipe.Top / 2,
+            Pipe.Width,
+            Pipe.Top
+        )
+
+        Context.restore()
+    }
+
+    function DrawBird() {
+        if (!DaveImage.complete || !DaveImage.naturalWidth) {
+            return
+        }
+
+        Context.drawImage(
+            DaveImage,
+            Bird.X - Bird.Width / 2,
+            Bird.Y - Bird.Height / 2,
+            Bird.Width,
+            Bird.Height
+        )
+    }
+
+    function Draw() {
+        Context.clearRect(
+            0,
+            0,
+            GameWidth,
+            GameHeight
+        )
+
+        for (const Pipe of Pipes) {
+            DrawPipe(Pipe)
+        }
+
+        DrawBird()
+    }
+
+    function GameLoop() {
+        if (!GameStarted) return
+
+        Update()
+        Draw()
+
+        if (GameStarted) {
+            requestAnimationFrame(GameLoop)
+        }
+    }
+
+    StartButton.onclick = StartGame
+    RestartButton.onclick = StartGame
+
+    Canvas.addEventListener("mousedown", function(Event) {
+        Event.preventDefault()
+        Flap()
+    })
+
+    Canvas.addEventListener("touchstart", function(Event) {
+        Event.preventDefault()
+        Flap()
+    }, { passive: false })
+
+    document.addEventListener("keydown", function(Event) {
+        if (
+            Event.code === "Space" ||
+            Event.code === "ArrowUp" ||
+            Event.code === "KeyW"
+        ) {
+            Event.preventDefault()
+
+            if (GameStarted) {
+                Flap()
+            } else {
+                StartGame()
+            }
+        }
+    })
+
+    UpdateHighScore()
+    Draw()
+</script>
+
+</body>
+</html>
