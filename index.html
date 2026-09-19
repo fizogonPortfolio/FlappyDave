@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -156,7 +157,7 @@
     </div>
 
     <div id="GameOverScreen">
-        <h1><strong>Game Over - Dave Got CUMMED On!</strong></h1>
+        <h1>Game Over!</h1>
         <div id="FinalScore">Score: 0</div>
         <button class="RestartButton" id="RestartButton">Restart</button>
     </div>
@@ -177,9 +178,9 @@
     const FinalScore = document.getElementById("FinalScore")
 
     const PipeImage = new Image()
-    PipeImage.src = "./Sprites/dildopic.png"
-
     const DaveImage = new Image()
+
+    PipeImage.src = "./Sprites/dildopic.png"
     DaveImage.src = "./Sprites/daveimage.png"
 
     const GameWidth = 900
@@ -189,6 +190,7 @@
     let Score = 0
     let HighestScore = Number(localStorage.getItem("FlappyDaveHighScore")) || 0
     let Pipes = []
+    let GameLoopRunning = false
 
     const Bird = {
         X: 170,
@@ -221,6 +223,7 @@
         ResetGame()
 
         GameStarted = true
+        GameLoopRunning = false
 
         StartScreen.style.display = "none"
         GameOverScreen.style.display = "none"
@@ -228,7 +231,7 @@
         CreatePipe(GameWidth + 100)
         CreatePipe(GameWidth + 500)
 
-        requestAnimationFrame(GameLoop)
+        StartGameLoop()
     }
 
     function GameOver() {
@@ -343,7 +346,7 @@
     }
 
     function DrawPipe(Pipe) {
-        if (!PipeImage.complete || !PipeImage.naturalWidth) {
+        if (!PipeImage.complete || PipeImage.naturalWidth === 0) {
             return
         }
 
@@ -376,7 +379,7 @@
     }
 
     function DrawBird() {
-        if (!DaveImage.complete || !DaveImage.naturalWidth) {
+        if (!DaveImage.complete || DaveImage.naturalWidth === 0) {
             return
         }
 
@@ -404,15 +407,23 @@
         DrawBird()
     }
 
+    function StartGameLoop() {
+        if (GameLoopRunning) return
+
+        GameLoopRunning = true
+        requestAnimationFrame(GameLoop)
+    }
+
     function GameLoop() {
-        if (!GameStarted) return
+        if (!GameStarted) {
+            GameLoopRunning = false
+            return
+        }
 
         Update()
         Draw()
 
-        if (GameStarted) {
-            requestAnimationFrame(GameLoop)
-        }
+        requestAnimationFrame(GameLoop)
     }
 
     StartButton.onclick = StartGame
@@ -443,6 +454,22 @@
             }
         }
     })
+
+    PipeImage.onload = function() {
+        Draw()
+    }
+
+    DaveImage.onload = function() {
+        Draw()
+    }
+
+    PipeImage.onerror = function() {
+        console.error("Could not load: ./Sprites/dildopic.png")
+    }
+
+    DaveImage.onerror = function() {
+        console.error("Could not load: ./Sprites/daveimage.png")
+    }
 
     UpdateHighScore()
     Draw()
